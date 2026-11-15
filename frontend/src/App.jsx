@@ -1,17 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Download, FileJson, Link2, Settings2, X } from 'lucide-react';
+import { useLocation, useNavigate } from 'wouter';
+import { AlertTriangle, Download, FileJson, Link2, X, RotateCcw } from 'lucide-react';
 import Header from './components/Header';
-import InvestigationControls from './components/InvestigationControls';
-import SpatialMap from './components/SpatialMap';
-import TimeSeriesChart from './components/TimeSeriesChart';
-import FindingsPanel from './components/FindingsPanel';
-import ProvenanceDrawer from './components/ProvenanceDrawer';
+import AskView from './components/AskView';
+import AnswerView from './components/AnswerView';
 import MethodologyModal from './components/MethodologyModal';
-import ResultSummary from './components/ResultSummary';
-import EmptyState from './components/EmptyState';
 import LoadingSkeleton from './components/LoadingSkeleton';
 import { fetchCatalog, fetchPresets, runInvestigation } from './utils/api';
-import { BENCHMARK, buildShareUrl, sameSelection, selectionFromUrl, writeSelectionToUrl } from './utils/url';
+import { BENCHMARK, selectionFromUrl, selectionToSearchParams, normalizeSelection, writeSelectionToUrl } from './utils/url';
 import { downloadFile, slugify, toCsv } from './utils/format';
 import { findLocationForCoords } from './data/locations';
 
@@ -21,76 +17,6 @@ function clamp(value, min, max, fallback) {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
   return Math.min(Math.max(number, min), max);
-}
-
-function normalizeSelection(selection, variables, catalog) {
-  const meta = variables.find((item) => item.id === selection.variable) || variables[0];
-  if (!meta) return selection;
-  const minYear = meta.min_year ?? catalog?.min_year ?? 1981;
-  const maxYear = meta.max_year ?? catalog?.max_year ?? 2026;
-  return {
-    ...selection,
-    variable: meta.id,
-    latitude: Number(clamp(selection.latitude, -90, 90, BENCHMARK.latitude).toFixed(4)),
-    longitude: Number(clamp(selection.longitude, -180, 180, BENCHMARK.longitude).toFixed(4)),
-    startYear: Math.round(clamp(selection.startYear, minYear, maxYear, BENCHMARK.startYear)),
-    endYear: Math.round(clamp(selection.endYear, minYear, maxYear, BENCHMARK.endYear))
-  };
-}
-
-function getValidation(selection, meta, catalog) {
-  const result = {
-    valid: false,
-    message: null,
-    latitudeInvalid: false,
-    longitudeInvalid: false,
-    startInvalid: false,
-    endInvalid: false
-  };
-
-  if (!meta) {
-    result.message = 'The NASA variable catalog is still loading.';
-    return result;
-  }
-
-  const minPeriod = catalog?.min_period_years ?? 5;
-
-  if (!Number.isFinite(selection.latitude) || selection.latitude < -90 || selection.latitude > 90) {
-    result.latitudeInvalid = true;
-    result.message = 'Latitude must be between −90° and +90°.';
-    return result;
-  }
-  if (!Number.isFinite(selection.longitude) || selection.longitude < -180 || selection.longitude > 180) {
-    result.longitudeInvalid = true;
-    result.message = 'Longitude must be between −180° and +180°.';
-    return result;
-  }
-  if (!Number.isInteger(selection.startYear) || selection.startYear < meta.min_year || selection.startYear > meta.max_year) {
-    result.startInvalid = true;
-    result.message = `${selection.variable} is available from ${meta.min_year} to ${meta.max_year}.`;
-    return result;
-  }
-  if (!Number.isInteger(selection.endYear) || selection.endYear < meta.min_year || selection.endYear > meta.max_year) {
-    result.endInvalid = true;
-    result.message = `${selection.variable} is available from ${meta.min_year} to ${meta.max_year}.`;
-    return result;
-  }
-  if (selection.startYear > selection.endYear) {
-    result.startInvalid = true;
-    result.endInvalid = true;
-    result.message = 'The start year cannot be after the end year.';
-    return result;
-  }
-  const span = selection.endYear - selection.startYear + 1;
-  if (span < minPeriod) {
-    result.startInvalid = true;
-    result.endInvalid = true;
-    result.message = `The analysis period must span at least ${minPeriod} calendar years (currently ${span}).`;
-    return result;
-  }
-
-  result.valid = true;
-  return result;
 }
 
 function readRecentRuns() {
@@ -128,6 +54,7 @@ async function copyText(text) {
 }
 
 export default function App() {
+  const [location, navigate] = useLocation();
   const [variables, setVariables] = useState([]);
   const [catalog, setCatalog] = useState(null);
   const [presets, setPresets] = useState([]);
@@ -141,8 +68,6 @@ export default function App() {
   const [stale, setStale] = useState(false);
   const [engineStatus, setEngineStatus] = useState('checking');
   const [methodologyOpen, setMethodologyOpen] = useState(false);
-  const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
-  const [provenanceOpen, setProvenanceOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [recentRuns, setRecentRuns] = useState(readRecentRuns);
   const [announcement, setAnnouncement] = useState('');
@@ -159,17 +84,13 @@ export default function App() {
     [variables, selection.variable]
   );
 
-  const validation = useMemo(
-    () => getValidation(selection, variableMeta, catalog),
-    [selection, variableMeta, catalog]
-  );
-
-  const dirty = Boolean(resultSelection) && !sameSelection(selection, resultSelection);
-
   const resultVariableMeta = useMemo(
     () => variables.find((item) => item.id === result?.provenance?.variable_id) || null,
     [result, variables]
   );
+
+  const isOnAskPage = location === '/' || location === '';
+  const isOnAnswerPage = location.startsWith('/investigate');
 
   // Load the variable catalog, availability metadata, and benchmark presets.
   useEffect(() => {
@@ -194,8 +115,6 @@ export default function App() {
         setEngineStatus('offline');
         setError(loadError.message || 'Failed to load the application configuration.');
       } finally {
-        // When the catalog loaded, keep the bootstrapping state until the
-        // automatic first investigation starts or is rejected.
         if (!controller.signal.aborted && !loadedCatalog) setIsBootstrapping(false);
       }
     })();
@@ -203,11 +122,11 @@ export default function App() {
     return () => controller.abort();
   }, [configAttempt]);
 
-  // Keep the investigation reproducible in the URL.
+  // Keep the investigation reproducible in the URL (only on answer page).
   useEffect(() => {
-    if (variables.length === 0) return;
+    if (variables.length === 0 || !isOnAnswerPage) return;
     writeSelectionToUrl(selection);
-  }, [selection, variables.length]);
+  }, [selection, variables.length, isOnAnswerPage]);
 
   // Abort an in-flight request when the component unmounts.
   useEffect(() => {
@@ -216,56 +135,6 @@ export default function App() {
       if (copiedTimer.current) window.clearTimeout(copiedTimer.current);
     };
   }, []);
-
-  // Lock background scrolling, contain focus, and support Escape for the
-  // mobile control drawer, which behaves as a modal dialog.
-  useEffect(() => {
-    if (!mobileControlsOpen) return undefined;
-    if (window.matchMedia('(min-width: 1024px)').matches) return undefined;
-    const panel = document.getElementById('investigation-panel');
-    const previouslyFocused = document.activeElement;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const getFocusable = () =>
-      panel
-        ? Array.from(
-            panel.querySelectorAll(
-              'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-            )
-          ).filter((element) => element.getClientRects().length > 0)
-        : [];
-
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') {
-        setMobileControlsOpen(false);
-        return;
-      }
-      if (event.key !== 'Tab') return;
-      const focusable = getFocusable();
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', onKeyDown);
-      if (previouslyFocused instanceof HTMLElement && previouslyFocused !== document.body) {
-        previouslyFocused.focus();
-      } else {
-        document.getElementById('open-setup')?.focus();
-      }
-    };
-  }, [mobileControlsOpen]);
 
   const enqueueInvestigation = useCallback(async (target) => {
     const requestId = ++requestSeq.current;
@@ -336,18 +205,15 @@ export default function App() {
 
   // Run the URL-selected investigation (or the benchmark) once the catalog is ready.
   useEffect(() => {
-    if (autoRan.current || variables.length === 0) return;
+    if (autoRan.current || variables.length === 0 || !isOnAnswerPage) return;
     autoRan.current = true;
 
-    // Validate the raw link values before normalization. Clamping an invalid
-    // shared link (for example latitude 95) would silently analyze a different
-    // place than the one the link claims.
+    // Validate the raw link values before normalization.
     const requestedMeta = variables.find((item) => item.id === selection.variable);
     if (!requestedMeta) {
-      // oxlint-disable-next-line react/set-state-in-effect -- malformed share link; release the loading skeleton
       setIsBootstrapping(false);
       setLinkError(
-        `This link requests "${selection.variable}", which is not in the NASA POWER catalog. Choose a variable in Setup or load the benchmark.`
+        `This link requests "${selection.variable}", which is not in the NASA POWER catalog.`
       );
       setAnnouncement('The shared link requests an unknown NASA variable.');
       return;
@@ -364,112 +230,94 @@ export default function App() {
     const target = normalizeSelection(selection, variables, catalog);
     setSelection(target);
     enqueueInvestigation(target);
-  }, [variables, catalog, selection, enqueueInvestigation]);
+  }, [variables, catalog, selection, enqueueInvestigation, isOnAnswerPage]);
 
-  const handleRun = useCallback(() => {
+  // Sync selection from URL when on answer page
+  useEffect(() => {
+    if (!isOnAnswerPage) return;
+    const params = new URLSearchParams(window.location.search);
+    const hasSelection = ['variable', 'lat', 'lon', 'start', 'end'].every((key) => params.has(key));
+    if (!hasSelection) return;
+
+    const target = {
+      variable: params.get('variable') || BENCHMARK.variable,
+      latitude: Number(params.get('lat')),
+      longitude: Number(params.get('lon')),
+      startYear: parseInt(params.get('start'), 10),
+      endYear: parseInt(params.get('end'), 10),
+      place: params.get('place') || null,
+    };
+
+    const requestedMeta = variables.find((item) => item.id === target.variable);
+    if (!requestedMeta) return;
+
+    const validation = getValidation(target, requestedMeta, catalog);
     if (!validation.valid) return;
-    setMobileControlsOpen(false);
-    enqueueInvestigation(selection);
-  }, [enqueueInvestigation, selection, validation.valid]);
+
+    const normalized = normalizeSelection(target, variables, catalog);
+    setSelection(normalized);
+  }, [location, variables, catalog, isOnAnswerPage]);
+
+  function getValidation(selection, meta, catalog) {
+    const result = {
+      valid: false,
+      message: null,
+      latitudeInvalid: false,
+      longitudeInvalid: false,
+      startInvalid: false,
+      endInvalid: false
+    };
+
+    if (!meta) {
+      result.message = 'The NASA variable catalog is still loading.';
+      return result;
+    }
+
+    const minPeriod = catalog?.min_period_years ?? 5;
+
+    if (!Number.isFinite(selection.latitude) || selection.latitude < -90 || selection.latitude > 90) {
+      result.latitudeInvalid = true;
+      result.message = 'Latitude must be between −90° and +90°.';
+      return result;
+    }
+    if (!Number.isFinite(selection.longitude) || selection.longitude < -180 || selection.longitude > 180) {
+      result.longitudeInvalid = true;
+      result.message = 'Longitude must be between −180° and +180°.';
+      return result;
+    }
+    if (!Number.isInteger(selection.startYear) || selection.startYear < meta.min_year || selection.startYear > meta.max_year) {
+      result.startInvalid = true;
+      result.message = `${selection.variable} is available from ${meta.min_year} to ${meta.max_year}.`;
+      return result;
+    }
+    if (!Number.isInteger(selection.endYear) || selection.endYear < meta.min_year || selection.endYear > meta.max_year) {
+      result.endInvalid = true;
+      result.message = `${selection.variable} is available from ${meta.min_year} to ${meta.max_year}.`;
+      return result;
+    }
+    if (selection.startYear > selection.endYear) {
+      result.startInvalid = true;
+      result.endInvalid = true;
+      result.message = 'The start year cannot be after the end year.';
+      return result;
+    }
+    const span = selection.endYear - selection.startYear + 1;
+    if (span < minPeriod) {
+      result.startInvalid = true;
+      result.endInvalid = true;
+      result.message = `The analysis period must span at least ${minPeriod} calendar years (currently ${span}).`;
+      return result;
+    }
+
+    result.valid = true;
+    return result;
+  }
 
   const handleRunBenchmark = useCallback(() => {
     const target = normalizeSelection({ ...BENCHMARK }, variables, catalog);
     setSelection(target);
-    setMobileControlsOpen(false);
     enqueueInvestigation(target);
   }, [catalog, enqueueInvestigation, variables]);
-
-  const handleVariableChange = useCallback(
-    (variableId) => {
-      setSelection((previous) => normalizeSelection({ ...previous, variable: variableId }, variables, catalog));
-    },
-    [catalog, variables]
-  );
-
-  const handleSelectPreset = useCallback(
-    (presetId) => {
-      const preset = presets.find((item) => item.id === presetId);
-      if (!preset) return;
-      const match = findLocationForCoords(preset.latitude, preset.longitude);
-      const place = match ? `${match.name}, ${match.admin}` : preset.name.replace(/\s*\(.*\)\s*$/, '');
-      setSelection((previous) =>
-        normalizeSelection(
-          {
-            ...previous,
-            latitude: preset.latitude,
-            longitude: preset.longitude,
-            startYear: preset.default_start,
-            endYear: preset.default_end,
-            place
-          },
-          variables,
-          catalog
-        )
-      );
-    },
-    [catalog, presets, variables]
-  );
-
-  const handleLocationChange = useCallback((next) => {
-    setSelection((previous) => ({
-      ...previous,
-      latitude: Number(clamp(next.latitude, -90, 90, previous.latitude).toFixed(4)),
-      longitude: Number(clamp(next.longitude, -180, 180, previous.longitude).toFixed(4)),
-      place: next.place ?? null
-    }));
-  }, []);
-
-  const handleMapSelect = useCallback((latitude, longitude) => {
-    setSelection((previous) => ({
-      ...previous,
-      latitude,
-      longitude,
-      place: null
-    }));
-  }, []);
-
-  const handleYearsChange = useCallback((startYear, endYear) => {
-    setSelection((previous) => ({
-      ...previous,
-      startYear: Math.round(startYear),
-      endYear: Math.round(endYear)
-    }));
-  }, []);
-
-  const handleReset = useCallback(() => {
-    setSelection(normalizeSelection({ ...BENCHMARK }, variables, catalog));
-    setError(null);
-    setLinkError(null);
-  }, [catalog, variables]);
-
-  const handleOpenSetup = useCallback(() => {
-    if (!window.matchMedia('(min-width: 1024px)').matches) setMobileControlsOpen(true);
-    window.setTimeout(() => document.getElementById('location-search-input')?.focus(), 90);
-  }, []);
-
-  const closeMethodology = useCallback(() => setMethodologyOpen(false), []);
-
-  const retryConfig = useCallback(() => {
-    setError(null);
-    setIsBootstrapping(true);
-    setEngineStatus('checking');
-    setConfigAttempt((attempt) => attempt + 1);
-  }, []);
-
-  const handleSelectRecent = useCallback(
-    (run) => {
-      const target = normalizeSelection(
-        { ...run, place: run.place === 'Custom point' ? null : run.place },
-        variables,
-        catalog
-      );
-      setSelection(target);
-      setMobileControlsOpen(false);
-      const meta = variables.find((item) => item.id === target.variable) || null;
-      if (getValidation(target, meta, catalog).valid) enqueueInvestigation(target);
-    },
-    [catalog, enqueueInvestigation, variables]
-  );
 
   const handleCopyLink = useCallback(async () => {
     try {
@@ -528,9 +376,65 @@ export default function App() {
     setAnnouncement('Full result JSON downloaded.');
   }, [fileBase, result]);
 
+  const closeMethodology = useCallback(() => setMethodologyOpen(false), []);
+
+  const retryConfig = useCallback(() => {
+    setError(null);
+    setIsBootstrapping(true);
+    setEngineStatus('checking');
+    setConfigAttempt((attempt) => attempt + 1);
+  }, []);
+
   const showInitialLoading = isBootstrapping || (isLoading && !result);
   const isUiBusy = isBootstrapping || isLoading;
-  const retry = variables.length === 0 ? retryConfig : handleRun;
+  const retry = variables.length === 0 ? retryConfig : () => enqueueInvestigation(selection);
+
+  // Render appropriate view based on route
+  const renderContent = () => {
+    if (isOnAnswerPage) {
+      return (
+        <AnswerView
+          result={result}
+          selection={selection}
+          variables={variables}
+          catalog={catalog}
+          presets={presets}
+          onRun={() => enqueueInvestigation(selection)}
+          onReset={() => {
+            const target = normalizeSelection({ ...BENCHMARK }, variables, catalog);
+            setSelection(target);
+            enqueueInvestigation(target);
+          }}
+          onSelectRecent={(run) => {
+            const target = normalizeSelection(
+              { ...run, place: run.place === 'Custom point' ? null : run.place },
+              variables,
+              catalog
+            );
+            setSelection(target);
+            const meta = variables.find((item) => item.id === target.variable) || null;
+            if (getValidation(target, meta, catalog).valid) enqueueInvestigation(target);
+          }}
+          recentRuns={recentRuns}
+          engineStatus={engineStatus}
+          isLoading={isLoading}
+          stale={stale}
+          dirty={Boolean(resultSelection) && !sameSelection(selection, resultSelection)}
+        />
+      );
+    }
+
+    // Ask view (landing page)
+    return (
+      <AskView
+        variables={variables}
+        catalog={catalog}
+        presets={presets}
+        onInvestigate={() => {}}
+        engineStatus={engineStatus}
+      />
+    );
+  };
 
   return (
     <div className="min-h-screen bg-base text-ink">
@@ -538,7 +442,7 @@ export default function App() {
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[100] focus:rounded-lg focus:bg-accent focus:px-3 focus:py-2 focus:text-[12px] focus:font-semibold focus:text-inverse"
       >
-        Skip to results
+        Skip to main content
       </a>
 
       <Header
@@ -547,254 +451,142 @@ export default function App() {
         provenance={result?.provenance}
       />
 
-      <div className="mx-auto max-w-[1600px] lg:grid lg:grid-cols-[340px_minmax(0,1fr)]">
-        <InvestigationControls
-          variables={variables}
-          catalog={catalog}
-          selectedVariable={selection.variable}
-          onChangeVariable={handleVariableChange}
-          presets={presets}
-          onSelectPreset={handleSelectPreset}
-          latitude={selection.latitude}
-          longitude={selection.longitude}
-          place={selection.place}
-          onChangeLocation={handleLocationChange}
-          startYear={selection.startYear}
-          endYear={selection.endYear}
-          onYearsChange={handleYearsChange}
-          onRun={handleRun}
-          isLoading={isLoading}
-          validation={validation}
-          onReset={handleReset}
-          dirty={dirty}
-          stale={stale}
-          recentRuns={recentRuns}
-          onSelectRecent={handleSelectRecent}
-          isMobileOpen={mobileControlsOpen}
-          onCloseMobile={() => setMobileControlsOpen(false)}
-        />
+      <main id="main-content" aria-busy={isUiBusy} className="min-h-[calc(100vh-4rem)]">
+        {showInitialLoading ? (
+          <LoadingSkeleton />
+        ) : (
+          renderContent()
+        )}
+      </main>
 
-        <main
-          id="main-content"
-          aria-busy={isUiBusy}
-          className="min-w-0 px-4 pb-28 pt-5 sm:px-6 sm:pt-6 lg:pb-8"
+      {linkError && (
+        <div
+          role="alert"
+          className="fixed bottom-4 left-4 right-4 md:bottom-20 md:left-auto md:right-4 md:w-96 z-50 flex flex-col gap-3 rounded-xl border border-accent/45 bg-accent/[0.08] p-3.5 shadow-xl animate-in slide-in-from-bottom-2 duration-300"
         >
-          <div className="space-y-4">
-            {showInitialLoading ? (
-              <LoadingSkeleton />
-            ) : result ? (
-              <>
-                <ResultSummary
-                  result={result}
-                  selection={resultSelection || selection}
-                  isLoading={isLoading}
-                  stale={stale || dirty}
-                  copied={copied}
-                  onCopyLink={handleCopyLink}
-                  onExportCsv={handleExportCsv}
-                  onExportJson={handleExportJson}
-                  onOpenProvenance={() => setProvenanceOpen(true)}
-                />
-                {provenanceOpen && (
-                  <ProvenanceDrawer
-                    provenance={result.provenance}
-                    onClose={() => setProvenanceOpen(false)}
-                  />
-                )}
-              </>
-            ) : (
-              <EmptyState onRunBenchmark={handleRunBenchmark} onOpenSetup={handleOpenSetup} />
-            )}
-
-            {linkError && (
-              <div
-                role="alert"
-                className="flex flex-col gap-3 rounded-xl border border-accent/45 bg-accent/[0.08] p-3.5 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="flex min-w-0 items-start gap-2.5">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold text-ink">Shared link rejected</p>
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{linkError}</p>
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={handleRunBenchmark}
-                    className="inline-flex min-h-9 items-center rounded-lg border border-accent/50 bg-base/60 px-3 text-[10px] font-semibold text-ink transition hover:bg-raised"
-                  >
-                    Load benchmark
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLinkError(null)}
-                    aria-label="Dismiss shared link warning"
-                    className="inline-grid h-9 w-9 place-items-center rounded-lg border border-line bg-base/60 text-muted transition hover:text-ink"
-                  >
-                    <X className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {error && (
-              <div
-                role="alert"
-                className="flex flex-col gap-3 rounded-xl border border-danger/45 bg-danger/[0.08] p-3.5 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="flex min-w-0 items-start gap-2.5">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" aria-hidden="true" />
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold text-ink">
-                      {result ? 'Update failed · showing the last successful result' : 'Investigation error'}
-                    </p>
-                    <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{error}</p>
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={retry}
-                    disabled={isLoading || (variables.length > 0 && !validation.valid)}
-                    className="inline-flex min-h-9 items-center rounded-lg border border-danger/50 bg-base/60 px-3 text-[10px] font-semibold text-ink transition hover:bg-raised disabled:opacity-50"
-                  >
-                    Retry
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setError(null)}
-                    aria-label="Dismiss error"
-                    className="inline-grid h-9 w-9 place-items-center rounded-lg border border-line bg-base/60 text-muted transition hover:text-ink"
-                  >
-                    <X className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {result && (
-              <>
-                <div className="grid gap-4 xl:grid-cols-3">
-                  <div className="min-w-0 xl:col-span-2">
-                    <TimeSeriesChart
-                      annualData={result.annual_data}
-                      monthlyData={result.monthly_data}
-                      sensSlope={result.sens_slope}
-                      linearRegression={result.linear_regression}
-                      variableMeta={resultVariableMeta || variableMeta}
-                    />
-                  </div>
-                  <div className="min-w-0 self-start">
-                    <SpatialMap
-                      latitude={selection.latitude}
-                      longitude={selection.longitude}
-                      onSelectCoords={handleMapSelect}
-                      spatialMeaning={variableMeta?.spatial_meaning || result.provenance.spatial_meaning}
-                      variableMeta={variableMeta}
-                      place={selection.place}
-                      isPreview={dirty}
-                    />
-                  </div>
-                </div>
-
-                <FindingsPanel
-                  findings={result.findings}
-                  mannKendall={result.mann_kendall}
-                  sensSlope={result.sens_slope}
-                  linearRegression={result.linear_regression}
-                  provenance={result.provenance}
-                  limitations={result.limitations}
-                />
-
-                <ProvenanceDrawer provenance={result.provenance} />
-              </>
-            )}
-
-            <footer className="flex flex-col gap-2 border-t border-line/70 pb-2 pt-4 text-[9px] leading-relaxed text-muted sm:flex-row sm:items-start sm:justify-between">
-              <p>
-                EarthScope · NASA Space Apps 2026 · Real observations from{' '}
-                <a
-                  href="https://power.larc.nasa.gov/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-accent hover:underline"
-                >
-                  NASA POWER
-                </a>{' '}
-                · No mock data
-              </p>
-              <p className="sm:text-right">
-                Imagery: NASA Earth at Night (VIIRS City Lights 2012) and Black Marble via NASA GIBS.
-                <br />
-                Results describe a single native grid cell — not an administrative area average.
-              </p>
-            </footer>
-          </div>
-        </main>
-      </div>
-
-      {/* Compact mobile action bar */}
-      <div
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/95 px-3 pt-2 backdrop-blur-md lg:hidden"
-        style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
-      >
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            id="open-setup"
-            onClick={handleOpenSetup}
-            aria-controls="investigation-panel"
-            aria-expanded={mobileControlsOpen}
-            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-line bg-base px-3 text-[11px] font-medium text-ink transition hover:border-accent/50"
-          >
-            <Settings2 className="h-4 w-4 text-accent" aria-hidden="true" />
-            Setup
-          </button>
-          <button
-            type="button"
-            onClick={handleRun}
-            disabled={isLoading || !validation.valid}
-            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-accent px-3 text-[11px] font-semibold text-inverse transition hover:bg-accent-deep disabled:opacity-55"
-          >
-            {isLoading ? 'Running…' : 'Run investigation'}
-          </button>
-          {result && (
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={handleCopyLink}
-                aria-label="Copy link to this investigation"
-                className="inline-grid h-11 w-10 place-items-center rounded-lg border border-line bg-base text-accent transition hover:bg-raised"
-              >
-                <Link2 className="h-4 w-4" aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                onClick={handleExportCsv}
-                aria-label="Download annual data as CSV"
-                className="inline-grid h-11 w-10 place-items-center rounded-lg border border-line bg-base text-accent transition hover:bg-raised"
-              >
-                <Download className="h-4 w-4" aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                onClick={handleExportJson}
-                aria-label="Download full result as JSON"
-                className="inline-grid h-11 w-10 place-items-center rounded-lg border border-line bg-base text-accent transition hover:bg-raised"
-              >
-                <FileJson className="h-4 w-4" aria-hidden="true" />
-              </button>
+          <div className="flex min-w-0 items-start gap-2.5">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold text-ink">Shared link rejected</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{linkError}</p>
             </div>
-          )}
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleRunBenchmark}
+              className="inline-flex min-h-9 items-center rounded-lg border border-accent/50 bg-base/60 px-3 text-[10px] font-semibold text-ink transition hover:bg-raised"
+            >
+              Load benchmark
+            </button>
+            <button
+              type="button"
+              onClick={() => setLinkError(null)}
+              aria-label="Dismiss shared link warning"
+              className="inline-grid h-9 w-9 place-items-center rounded-lg border border-line bg-base/60 text-muted transition hover:text-ink"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {error && (
+        <div
+          role="alert"
+          className="fixed bottom-4 left-4 right-4 md:bottom-20 md:left-auto md:right-4 md:w-96 z-50 flex flex-col gap-3 rounded-xl border border-danger/45 bg-danger/[0.08] p-3.5 shadow-xl animate-in slide-in-from-bottom-2 duration-300"
+        >
+          <div className="flex min-w-0 items-start gap-2.5">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-danger" aria-hidden="true" />
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold text-ink">
+                {result ? 'Update failed · showing the last successful result' : 'Investigation error'}
+              </p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{error}</p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={retry}
+              disabled={isLoading || (variables.length > 0 && !getValidation(selection, variableMeta, catalog).valid)}
+              className="inline-flex min-h-9 items-center rounded-lg border border-danger/50 bg-base/60 px-3 text-[10px] font-semibold text-ink transition hover:bg-raised disabled:opacity-50"
+            >
+              Retry
+            </button>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              aria-label="Dismiss error"
+              className="inline-grid h-9 w-9 place-items-center rounded-lg border border-line bg-base/60 text-muted transition hover:text-ink"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <p className="sr-only" role="status" aria-live="polite">
         {announcement}
       </p>
 
-      <MethodologyModal isOpen={methodologyOpen} onClose={closeMethodology} />
+      <MethodologyModal isOpen={methodologyOpen} onClose={() => setMethodologyOpen(false)} />
     </div>
   );
+}
+
+// Helper function moved outside component for use in effects
+function getValidation(selection, meta, catalog) {
+  const result = {
+    valid: false,
+    message: null,
+    latitudeInvalid: false,
+    longitudeInvalid: false,
+    startInvalid: false,
+    endInvalid: false
+  };
+
+  if (!meta) {
+    result.message = 'The NASA variable catalog is still loading.';
+    return result;
+  }
+
+  const minPeriod = catalog?.min_period_years ?? 5;
+
+  if (!Number.isFinite(selection.latitude) || selection.latitude < -90 || selection.latitude > 90) {
+    result.latitudeInvalid = true;
+    result.message = 'Latitude must be between −90° and +90°.';
+    return result;
+  }
+  if (!Number.isFinite(selection.longitude) || selection.longitude < -180 || selection.longitude > 180) {
+    result.longitudeInvalid = true;
+    result.message = 'Longitude must be between −180° and +180°.';
+    return result;
+  }
+  if (!Number.isInteger(selection.startYear) || selection.startYear < meta.min_year || selection.startYear > meta.max_year) {
+    result.startInvalid = true;
+    result.message = `${selection.variable} is available from ${meta.min_year} to ${meta.max_year}.`;
+    return result;
+  }
+  if (!Number.isInteger(selection.endYear) || selection.endYear < meta.min_year || selection.endYear > meta.max_year) {
+    result.endInvalid = true;
+    result.message = `${selection.variable} is available from ${meta.min_year} to ${meta.max_year}.`;
+    return result;
+  }
+  if (selection.startYear > selection.endYear) {
+    result.startInvalid = true;
+    result.endInvalid = true;
+    result.message = 'The start year cannot be after the end year.';
+    return result;
+  }
+  const span = selection.endYear - selection.startYear + 1;
+  if (span < minPeriod) {
+    result.startInvalid = true;
+    result.endInvalid = true;
+    result.message = `The analysis period must span at least ${minPeriod} calendar years (currently ${span}).`;
+    return result;
+  }
+
+  result.valid = true;
+  return result;
 }
