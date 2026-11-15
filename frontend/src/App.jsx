@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'wouter';
+import { useLocation } from 'wouter';
 import { AlertTriangle, Download, FileJson, Link2, X, RotateCcw } from 'lucide-react';
 import Header from './components/Header';
 import AskView from './components/AskView';
