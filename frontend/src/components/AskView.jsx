@@ -168,6 +168,8 @@ export default function AskView({ variables, catalog, presets, onInvestigate, en
                 place={place}
                 onSelect={handleLocationSelect}
                 onMapSelect={handleMapSelect}
+                onManualCoordsChange={handleManualCoordsChange}
+                manualCoords={manualCoords}
                 disabled={isLoading}
               />
               {geoError && (
@@ -175,6 +177,21 @@ export default function AskView({ variables, catalog, presets, onInvestigate, en
                   <Crosshair className="h-3.5 w-3.5" aria-hidden="true" />
                   {geoError}
                 </p>
+              )}
+              {(latitude !== null && longitude !== null) && (
+                <div className="mt-3 p-3 rounded-lg border border-accent/30 bg-accent/5 text-[11px]">
+                  <div className="flex items-center gap-2 text-accent">
+                    <MapPin className="h-4 w-4" aria-hidden="true" />
+                    <span className="font-medium text-ink">Selected: {place}</span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-4 text-[10px] text-muted">
+                    <span className="font-mono">{formatCoord(latitude, 'lat')}</span>
+                    <span className="font-mono">{formatCoord(longitude, 'lon')}</span>
+                    <span className="px-2 py-0.5 rounded border border-accent/30 bg-accent/10 text-accent text-[9px]">
+                      Ready to investigate
+                    </span>
+                  </div>
+                </div>
               )}
             </fieldset>
 

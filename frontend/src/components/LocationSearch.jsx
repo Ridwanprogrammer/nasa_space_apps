@@ -12,7 +12,7 @@ export default function LocationSearch({
   onSelect,
   onMapSelect,
   onManualCoordsChange,
-  manualCoords,
+  manualCoords = { lat: '', lon: '' },
   disabled = false
 }) {
   const listId = useId();

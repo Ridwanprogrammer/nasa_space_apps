@@ -1,8 +1,18 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Map, Maximize2, Minimize2, Target } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+
+function MapRecenter({ latitude, longitude }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+    map.setView([latitude, longitude], map.getZoom());
+  }, [latitude, longitude, map]);
+
+  return null;
+}
 
 function ClickHandler({ onSelect, disabled }) {
   useMapEvents({
@@ -18,9 +28,6 @@ function ClickHandler({ onSelect, disabled }) {
 }
 
 function FullscreenMap({ latitude, longitude, onSelect, disabled, onClose }) {
-  const mapRef = useRef(null);
-  const [isFullscreen, setIsFullscreen] = useState(true);
-
   // Default to world view if no coordinates
   const center = (latitude !== null && longitude !== null) ? [latitude, longitude] : [0, 0];
   const zoom = (latitude !== null && longitude !== null) ? 4 : 2;
@@ -58,7 +65,6 @@ function FullscreenMap({ latitude, longitude, onSelect, disabled, onClose }) {
 
       <div className="flex-1 relative">
         <MapContainer
-          ref={mapRef}
           center={center}
           zoom={zoom}
           minZoom={2}
@@ -73,6 +79,7 @@ function FullscreenMap({ latitude, longitude, onSelect, disabled, onClose }) {
             maxNativeZoom={8}
             attribution='Imagery: NASA GIBS · VIIRS Black Marble'
           />
+          <MapRecenter latitude={latitude} longitude={longitude} />
           {(latitude !== null && longitude !== null) && (
             <Marker position={[latitude, longitude]}>
               <div className="w-4 h-4 rounded-full bg-accent border-2 border-inverse shadow-lg" aria-hidden="true" />
@@ -132,6 +139,7 @@ export default function MapPreview({ latitude, longitude, onSelect, disabled }) 
           maxNativeZoom={8}
           attribution='Imagery: NASA GIBS · VIIRS Black Marble'
         />
+        <MapRecenter latitude={latitude} longitude={longitude} />
         {(latitude !== null && longitude !== null) && (
           <Marker position={[latitude, longitude]}>
             <div className="w-3 h-3 rounded-full bg-accent border-2 border-inverse shadow-lg" aria-hidden="true" />
