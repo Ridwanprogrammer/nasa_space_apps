@@ -81,6 +81,8 @@ export default function App() {
   const requestSeq = useRef(0);
   const autoRan = useRef(false);
   const copiedTimer = useRef(null);
+  const previousAnswerPage = useRef(null);
+  const awaitingUrlSelection = useRef(false);
 
   const variableMeta = useMemo(
     () => variables.find((item) => item.id === selection.variable) || null,
@@ -127,7 +129,22 @@ export default function App() {
 
   // Keep the investigation reproducible in the URL (only on answer page).
   useEffect(() => {
-    if (variables.length === 0 || !isOnAnswerPage) return;
+    const enteredAnswerPage = isOnAnswerPage && previousAnswerPage.current === false;
+    previousAnswerPage.current = isOnAnswerPage;
+
+    if (!isOnAnswerPage) {
+      awaitingUrlSelection.current = false;
+      return;
+    }
+
+    if (enteredAnswerPage) {
+      const params = new URLSearchParams(window.location.search);
+      awaitingUrlSelection.current = ['variable', 'lat', 'lon', 'start', 'end'].every((key) =>
+        params.has(key)
+      );
+    }
+
+    if (variables.length === 0 || awaitingUrlSelection.current) return;
     writeSelectionToUrl(selection);
   }, [selection, variables.length, isOnAnswerPage]);
 
@@ -209,7 +226,12 @@ export default function App() {
   // Run the URL-selected investigation (or the benchmark) once the catalog is ready.
   // Only auto-run if the selection came from a valid URL (not the default benchmark).
   useEffect(() => {
-    if (autoRan.current || variables.length === 0 || !isOnAnswerPage) return;
+    if (!isOnAnswerPage) {
+      autoRan.current = false;
+      if (selectionFromUrlFlag) setSelectionFromUrlFlag(false);
+      return;
+    }
+    if (autoRan.current || variables.length === 0 || awaitingUrlSelection.current) return;
     // If selection didn't come from URL, wait for the URL sync effect to update it
     if (!selectionFromUrlFlag) return;
     autoRan.current = true;
@@ -236,7 +258,7 @@ export default function App() {
     const target = normalizeSelection(selection, variables, catalog);
     setSelection(target);
     enqueueInvestigation(target);
-  }, [variables, catalog, selection, enqueueInvestigation, isOnAnswerPage]);
+  }, [variables, catalog, selection, selectionFromUrlFlag, enqueueInvestigation, isOnAnswerPage]);
 
   // Sync selection from URL when on answer page
   useEffect(() => {
@@ -263,6 +285,7 @@ export default function App() {
     const normalized = normalizeSelection(target, variables, catalog);
     setSelection(normalized);
     setSelectionFromUrlFlag(true); // Mark that we now have a URL-sourced selection
+    awaitingUrlSelection.current = false;
   }, [location, variables, catalog, isOnAnswerPage]);
 
   function getValidation(selection, meta, catalog) {

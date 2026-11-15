@@ -20,6 +20,7 @@ export default function LocationSearch({
   const hintId = useId();
   const rootRef = useRef(null);
   const inputRef = useRef(null);
+  const portalRef = useRef(null);
   const [query, setQuery] = useState(place || '');
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -36,7 +37,9 @@ export default function LocationSearch({
 
   useEffect(() => {
     const onPointerDown = (event) => {
-      if (!rootRef.current?.contains(event.target)) setIsOpen(false);
+      if (!rootRef.current?.contains(event.target) && !portalRef.current?.contains(event.target)) {
+        setIsOpen(false);
+      }
     };
     document.addEventListener('pointerdown', onPointerDown);
     return () => document.removeEventListener('pointerdown', onPointerDown);
@@ -247,6 +250,7 @@ export default function LocationSearch({
 
       {isOpen && createPortal(
         <div
+          ref={portalRef}
           id={`${listId}-portal`}
           className="fixed left-0 right-0 top-[calc(100%+4px)] z-[60] overflow-hidden rounded-lg border border-line bg-surface shadow-2xl pointer-events-auto"
           style={{
