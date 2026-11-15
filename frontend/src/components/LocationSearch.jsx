@@ -1,4 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Crosshair, MapPin, Search, X, Loader2, AlertCircle } from 'lucide-react';
 import { searchLocations } from '../data/locations';
 import { formatCoord } from '../utils/format';
@@ -16,7 +17,7 @@ export default function LocationSearch({ latitude, longitude, place, onSelect, o
   const [geoState, setGeoState] = useState('idle');
   const [geoError, setGeoError] = useState(null);
 
-  const results = useMemo(() => searchLocations(query, 8), [query]);
+  const results = useMemo(() => searchLocations(query, query ? 8 : 25), [query]);
   const currentLabel = place || 'Custom coordinates';
 
   useEffect(() => {
@@ -33,6 +34,19 @@ export default function LocationSearch({ latitude, longitude, place, onSelect, o
     document.addEventListener('pointerdown', onPointerDown);
     return () => document.removeEventListener('pointerdown', onPointerDown);
   }, []);
+
+  // Show suggestions on focus even when query is empty
+  const handleFocus = (event) => {
+    setIsOpen(true);
+    setActiveIndex(-1); // Reset selection so Enter doesn't auto-pick first item
+    if (place && event.target.value === place) event.target.select();
+  };
+
+  // Ensure dropdown opens on click (for mobile/touch)
+  const handleClick = () => {
+    setIsOpen(true);
+    setActiveIndex(-1);
+  };
 
   const choose = (location) => {
     setQuery(location.name);
@@ -54,7 +68,7 @@ export default function LocationSearch({ latitude, longitude, place, onSelect, o
       event.preventDefault();
       setActiveIndex((index) => Math.max(index - 1, 0));
     } else if (event.key === 'Enter') {
-      if (isOpen && results[activeIndex]) {
+      if (isOpen && activeIndex >= 0 && results[activeIndex]) {
         event.preventDefault();
         choose(results[activeIndex]);
       }
@@ -131,10 +145,8 @@ export default function LocationSearch({ latitude, longitude, place, onSelect, o
             setActiveIndex(0);
             setIsOpen(true);
           }}
-          onFocus={(event) => {
-            setIsOpen(true);
-            if (place && event.target.value === place) event.target.select();
-          }}
+          onFocus={handleFocus}
+          onClick={handleClick}
           onKeyDown={handleKeyDown}
           onBlur={() => {
             window.setTimeout(() => setIsOpen(false), 120);
@@ -163,46 +175,60 @@ export default function LocationSearch({ latitude, longitude, place, onSelect, o
         {currentLabel} · {formatCoord(latitude, 'lat')}, {formatCoord(longitude, 'lon')}
       </p>
 
-      {isOpen && results.length > 0 && (
-        <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 overflow-hidden rounded-lg border border-line bg-surface shadow-2xl">
+      {isOpen && createPortal(
+        <div
+          id={`${listId}-portal`}
+          className="fixed left-0 right-0 top-[calc(100%+4px)] z-[60] overflow-hidden rounded-lg border border-line bg-surface shadow-2xl pointer-events-auto"
+          style={{
+            position: 'fixed',
+            left: inputRef.current?.getBoundingClientRect().left ?? 0,
+            right: window.innerWidth - (inputRef.current?.getBoundingClientRect().right ?? 0),
+            top: (inputRef.current?.getBoundingClientRect().bottom ?? 0) + 4,
+          }}
+        >
           <p className="border-b border-line px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-muted">
-            {query ? 'Matches' : 'Suggested places'}
+            {query ? 'Matches' : 'Popular places'}
           </p>
           <ul id={listId} role="listbox" aria-label="Location matches" className="max-h-72 overflow-y-auto py-1">
-            {results.map((location, index) => {
-              const isActive = index === activeIndex;
-              return (
-                <li
-                  key={location.id}
-                  id={`${listId}-${location.id}`}
-                  role="option"
-                  aria-selected={isActive}
-                  onMouseDown={(event) => {
-                    event.preventDefault();
-                    choose(location);
-                  }}
-                  onMouseEnter={() => setActiveIndex(index)}
-                  className={`mx-1 cursor-pointer rounded-md px-2.5 py-2 transition ${
-                    isActive ? 'bg-raised' : 'hover:bg-raised/70'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-[12px] font-medium text-ink">{location.name}</span>
-                    {location.type === 'climate' && (
-                      <span className="shrink-0 rounded border border-cool/40 bg-cool/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-cool">
-                        Site
-                      </span>
-                    )}
-                  </div>
-                  <p className="truncate text-[10px] text-muted">
-                    {location.admin} · {location.region}
-                    {location.note ? ` · ${location.note}` : ''}
-                  </p>
-                </li>
-              );
-            })}
+            {results.length > 0 ? (
+              results.map((location, index) => {
+                const isActive = index === activeIndex;
+                return (
+                  <li
+                    key={location.id}
+                    id={`${listId}-${location.id}`}
+                    role="option"
+                    aria-selected={isActive}
+                    onMouseDown={(event) => {
+                      event.preventDefault();
+                      choose(location);
+                    }}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    className={`mx-1 cursor-pointer rounded-md px-2.5 py-2 transition ${
+                      isActive ? 'bg-raised' : 'hover:bg-raised/70'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-[12px] font-medium text-ink">{location.name}</span>
+                      {location.type === 'climate' && (
+                        <span className="shrink-0 rounded border border-cool/40 bg-cool/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-cool">
+                          Site
+                        </span>
+                      )}
+                    </div>
+                    <p className="truncate text-[10px] text-muted">
+                      {location.admin} · {location.region}
+                      {location.note ? ` · ${location.note}` : ''}
+                    </p>
+                  </li>
+                );
+              })
+            ) : (
+              <li className="mx-1 px-2.5 py-2 text-[10px] text-muted text-center">No places found</li>
+            )}
           </ul>
-        </div>
+        </div>,
+        document.body
       )}
 
       <button

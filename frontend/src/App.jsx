@@ -7,7 +7,7 @@ import AnswerView from './components/AnswerView';
 import MethodologyModal from './components/MethodologyModal';
 import LoadingSkeleton from './components/LoadingSkeleton';
 import { fetchCatalog, fetchPresets, runInvestigation } from './utils/api';
-import { BENCHMARK, selectionFromUrl, selectionToSearchParams, normalizeSelection, writeSelectionToUrl } from './utils/url';
+import { BENCHMARK, selectionFromUrl, selectionToSearchParams, normalizeSelection, writeSelectionToUrl, sameSelection } from './utils/url';
 import { downloadFile, slugify, toCsv } from './utils/format';
 import { findLocationForCoords } from './data/locations';
 
@@ -58,7 +58,10 @@ export default function App() {
   const [variables, setVariables] = useState([]);
   const [catalog, setCatalog] = useState(null);
   const [presets, setPresets] = useState([]);
-  const [selection, setSelection] = useState(() => selectionFromUrl() || { ...BENCHMARK });
+  // Track whether selection came from URL or is the default benchmark
+  const urlSelection = selectionFromUrl();
+  const [selection, setSelection] = useState(() => urlSelection || { ...BENCHMARK });
+  const [selectionFromUrlFlag, setSelectionFromUrlFlag] = useState(!!urlSelection);
   const [result, setResult] = useState(null);
   const [resultSelection, setResultSelection] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -115,7 +118,7 @@ export default function App() {
         setEngineStatus('offline');
         setError(loadError.message || 'Failed to load the application configuration.');
       } finally {
-        if (!controller.signal.aborted && !loadedCatalog) setIsBootstrapping(false);
+        if (!controller.signal.aborted) setIsBootstrapping(false);
       }
     })();
 
@@ -201,11 +204,14 @@ export default function App() {
         abortRef.current = null;
       }
     }
-  }, []);
+  }, [sameSelection]);
 
   // Run the URL-selected investigation (or the benchmark) once the catalog is ready.
+  // Only auto-run if the selection came from a valid URL (not the default benchmark).
   useEffect(() => {
     if (autoRan.current || variables.length === 0 || !isOnAnswerPage) return;
+    // If selection didn't come from URL, wait for the URL sync effect to update it
+    if (!selectionFromUrlFlag) return;
     autoRan.current = true;
 
     // Validate the raw link values before normalization.
@@ -256,6 +262,7 @@ export default function App() {
 
     const normalized = normalizeSelection(target, variables, catalog);
     setSelection(normalized);
+    setSelectionFromUrlFlag(true); // Mark that we now have a URL-sourced selection
   }, [location, variables, catalog, isOnAnswerPage]);
 
   function getValidation(selection, meta, catalog) {

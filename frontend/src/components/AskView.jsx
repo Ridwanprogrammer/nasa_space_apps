@@ -46,9 +46,9 @@ export default function AskView({ variables, catalog, presets, onInvestigate, en
   const [selectedPreset, setSelectedPreset] = useState('full');
   const [customStart, setCustomStart] = useState(1990);
   const [customEnd, setCustomEnd] = useState(2023);
-  const [latitude, setLatitude] = useState(BENCHMARK.latitude);
-  const [longitude, setLongitude] = useState(BENCHMARK.longitude);
-  const [place, setPlace] = useState(BENCHMARK.place);
+  const [latitude, setLatitude] = useState(null);
+  const [longitude, setLongitude] = useState(null);
+  const [place, setPlace] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [geoError, setGeoError] = useState(null);
 
@@ -82,6 +82,10 @@ export default function AskView({ variables, catalog, presets, onInvestigate, en
 
   const handleRun = useCallback(async () => {
     if (isLoading) return;
+    if (latitude === null || longitude === null) {
+      setGeoError('Please select a location first.');
+      return;
+    }
     setIsLoading(true);
     setGeoError(null);
 
@@ -116,16 +120,6 @@ export default function AskView({ variables, catalog, presets, onInvestigate, en
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <header className="border-b border-line/50 bg-base/80 backdrop-blur-sm sticky top-0 z-40">
-        <div className="mx-auto max-w-4xl px-4 py-3 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2" style={{ textDecoration: 'none' }}>
-            <span className="text-[14px] font-semibold uppercase tracking-[0.12em] text-accent">EarthScope</span>
-            <span className="text-[10px] text-muted">NASA Space Apps 2026</span>
-          </Link>
-        </div>
-      </header>
-
       {/* Main Content */}
       <main className="flex-1 flex items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
         <div className="w-full max-w-3xl">
@@ -143,7 +137,7 @@ export default function AskView({ variables, catalog, presets, onInvestigate, en
           <div className="rounded-2xl border border-line bg-surface p-6 sm:p-8 space-y-8">
             {/* Step 1: Location */}
             <fieldset>
-              <legend className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent mb-4">01 · Where</legend>
+              <legend className="text-[11px] font-semibold text-ink mb-4">Where</legend>
               <LocationSearch
                 latitude={latitude}
                 longitude={longitude}
@@ -162,7 +156,7 @@ export default function AskView({ variables, catalog, presets, onInvestigate, en
 
             {/* Step 2: Variable */}
             <fieldset>
-              <legend className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent mb-4">02 · What</legend>
+              <legend className="text-[11px] font-semibold text-ink mb-4">What</legend>
               <div className="grid grid-cols-3 gap-3" role="radiogroup" aria-label="Select variable">
                 {VARIABLE_OPTIONS.map((v) => (
                   <button
@@ -184,7 +178,7 @@ export default function AskView({ variables, catalog, presets, onInvestigate, en
 
             {/* Step 3: Period */}
             <fieldset>
-              <legend className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent mb-4">03 · When</legend>
+              <legend className="text-[11px] font-semibold text-ink mb-4">When</legend>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" role="radiogroup" aria-label="Select period preset">
                   {PERIOD_PRESETS.map((p) => (
@@ -236,52 +230,37 @@ export default function AskView({ variables, catalog, presets, onInvestigate, en
                   </div>
                 )}
 
-                <p className="text-[10px] text-muted">
-                  Available range for {variableMeta.name}: {minYear}–{maxYear} · Latest complete year: {latestComplete} · Minimum 5 years
-                </p>
                 {selectedPreset === 'custom' && !isCustomValid && (
                   <p className="text-[10px] text-danger" role="alert">Please enter a valid range (min 5 years, within available data).</p>
                 )}
               </div>
             </fieldset>
 
-            {/* Engine Status */}
-            <div className="flex items-center justify-between pt-4 border-t border-line/50">
-              <div className="flex items-center gap-2 text-[10px] text-muted">
-                <span className={`w-2 h-2 rounded-full ${engineStatus === 'online' ? 'bg-significant' : engineStatus === 'checking' ? 'bg-accent animate-pulse' : 'bg-danger'}`} aria-hidden="true" />
-                <span>Engine: {engineStatus === 'online' ? 'Online' : engineStatus === 'checking' ? 'Checking…' : 'Offline'}</span>
-              </div>
-              <button
-                type="button"
-                onClick={handleRun}
-                disabled={isLoading || (selectedPreset === 'custom' && !isCustomValid) || !place}
-                className="inline-flex items-center gap-2 min-h-12 px-6 rounded-lg bg-accent text-inverse font-semibold text-[13px] transition hover:bg-accent-deep disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-                    Investigating…
-                  </>
-                ) : (
-                  <>
-                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                    Investigate
-                  </>
-                )}
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleRun}
+              disabled={isLoading || (selectedPreset === 'custom' && !isCustomValid) || latitude === null || longitude === null}
+              className="inline-flex items-center gap-2 min-h-12 px-6 rounded-lg bg-accent text-inverse font-semibold text-[13px] transition hover:bg-accent-deep disabled:opacity-50 disabled:cursor-not-allowed w-full"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  Investigating…
+                </>
+              ) : (
+                <>
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  Investigate
+                </>
+              )}
+            </button>
           </div>
-
-          {/* Benchmark Link */}
-          <p className="mt-6 text-center text-[11px] text-muted">
-            Or try the <Link href={`/?${selectionToSearchParams(BENCHMARK).toString()}`} className="text-accent hover:underline">Abuja benchmark</Link> (Temperature, 1990–2023).
-          </p>
         </div>
       </main>
 
       {/* Footer */}
       <footer className="border-t border-line/50 bg-base/50 px-4 py-4 text-center text-[10px] text-muted">
-        Real NASA POWER observations · No mock data · <a href="https://power.larc.nasa.gov/" target="_blank" rel="noreferrer" className="text-accent hover:underline">Data source</a>
+        <a href="https://power.larc.nasa.gov/" target="_blank" rel="noreferrer" className="text-accent hover:underline">Data source: NASA POWER</a>
       </footer>
     </div>
   );

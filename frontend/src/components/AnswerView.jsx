@@ -123,29 +123,6 @@ export default function AnswerView({
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Header */}
-      <header className="border-b border-line/50 bg-base/80 backdrop-blur-sm sticky top-0 z-40">
-        <div className="mx-auto max-w-6xl px-4 py-3 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2" style={{ textDecoration: 'none' }}>
-            <span className="text-[14px] font-semibold uppercase tracking-[0.12em] text-accent">EarthScope</span>
-            <span className="text-[10px] text-muted">NASA Space Apps 2026</span>
-          </Link>
-
-          <div className="flex items-center gap-2 ml-auto">
-            <button
-              type="button"
-              onClick={handleNewInvestigation}
-              className="inline-flex items-center gap-1.5 min-h-9 px-3 rounded-lg border border-line bg-base text-[10px] font-medium text-muted transition hover:border-accent/50 hover:text-ink"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
-              <span className="hidden sm:inline">New investigation</span>
-            </button>
-
-            <span className={`w-2 h-2 rounded-full ${engineStatus === 'online' ? 'bg-significant' : engineStatus === 'checking' ? 'bg-accent animate-pulse' : 'bg-danger'}`} aria-hidden="true" />
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <main className="flex-1 mx-auto max-w-6xl w-full px-4 py-6 sm:px-6 lg:px-8">
         {/* Context Pills */}
@@ -245,6 +222,7 @@ export default function AnswerView({
               type="button"
               onClick={handleCopyLink}
               className="inline-flex items-center gap-1.5 min-h-10 px-4 rounded-lg border border-line bg-base text-[11px] font-medium text-muted transition hover:border-accent/50 hover:text-ink"
+              title="Copy a shareable link to this investigation"
             >
               {copied ? (
                 <>
@@ -262,6 +240,7 @@ export default function AnswerView({
               type="button"
               onClick={handleExportCsv}
               className="inline-flex items-center gap-1.5 min-h-10 px-4 rounded-lg border border-line bg-base text-[11px] font-medium text-muted transition hover:border-accent/50 hover:text-ink"
+              title="Download data as CSV"
             >
               <Download className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
               <span className="hidden sm:inline">CSV</span>
@@ -270,6 +249,7 @@ export default function AnswerView({
               type="button"
               onClick={handleExportJson}
               className="inline-flex items-center gap-1.5 min-h-10 px-4 rounded-lg border border-line bg-base text-[11px] font-medium text-muted transition hover:border-accent/50 hover:text-ink"
+              title="Download full results as JSON"
             >
               <FileJson className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
               <span className="hidden sm:inline">JSON</span>
@@ -282,18 +262,14 @@ export default function AnswerView({
             className="inline-flex items-center gap-1.5 min-h-10 px-5 rounded-lg bg-accent text-inverse font-semibold text-[11px] transition hover:bg-accent-deep"
           >
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            New investigation
+            Start new investigation
           </button>
         </div>
       </main>
 
       {/* Footer */}
       <footer className="border-t border-line/50 bg-base/50 px-4 py-4 text-center text-[10px] text-muted">
-        Real NASA POWER observations · No mock data ·{' '}
-        <a href="https://power.larc.nasa.gov/" target="_blank" rel="noreferrer" className="text-accent hover:underline">
-          Data source
-        </a>{' '}·{' '}
-        Imagery: NASA GIBS VIIRS Black Marble
+        <a href="https://power.larc.nasa.gov/" target="_blank" rel="noreferrer" className="text-accent hover:underline">Data source: NASA POWER</a> · Imagery: NASA GIBS VIIRS Black Marble
       </footer>
     </div>
   );

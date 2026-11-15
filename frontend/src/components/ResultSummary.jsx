@@ -4,7 +4,6 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  Download,
   FileJson,
   Link2,
   Loader2,
@@ -85,7 +84,7 @@ export default function ResultSummary({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-accent">02 · Result</p>
+              <p className="text-[10px] font-semibold text-accent">Result</p>
               {stale && (
                 <span className="rounded-full border border-accent/60 bg-accent/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent">
                   Stale · last successful run
@@ -135,26 +134,6 @@ export default function ResultSummary({
                 <Link2 className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
               )}
               <span className="hidden sm:inline">{copied ? 'Copied' : 'Copy link'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={onExportCsv}
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-base px-2.5 text-[10px] font-medium text-muted transition hover:border-accent/50 hover:text-ink"
-              title="Download annual observations as CSV"
-              aria-label="Download annual observations as CSV"
-            >
-              <Download className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
-              <span className="hidden sm:inline">CSV</span>
-            </button>
-            <button
-              type="button"
-              onClick={onExportJson}
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-line bg-base px-2.5 text-[10px] font-medium text-muted transition hover:border-accent/50 hover:text-ink"
-              title="Download the full result, method, and provenance as JSON"
-              aria-label="Download full result as JSON"
-            >
-              <FileJson className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
-              <span className="hidden sm:inline">JSON</span>
             </button>
             {onOpenProvenance && (
               <button
