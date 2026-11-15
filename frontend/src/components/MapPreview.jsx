@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Map, Maximize2, Minimize2 } from 'lucide-react';
+import { Map, Maximize2, Minimize2, Target } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -30,7 +30,6 @@ function FullscreenMap({ latitude, longitude, onSelect, disabled, onClose }) {
       if (e.key === 'Escape') onClose();
     };
     document.addEventListener('keydown', handleEsc);
-    // Lock body scroll
     document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', handleEsc);
@@ -40,7 +39,6 @@ function FullscreenMap({ latitude, longitude, onSelect, disabled, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-base flex flex-col">
-      {/* Fullscreen header */}
       <div className="flex items-center justify-between p-4 border-b border-line bg-base/95 backdrop-blur-sm">
         <div className="flex items-center gap-3">
           <Map className="h-6 w-6 text-accent" aria-hidden="true" />
@@ -58,7 +56,6 @@ function FullscreenMap({ latitude, longitude, onSelect, disabled, onClose }) {
         </button>
       </div>
 
-      {/* Map */}
       <div className="flex-1 relative">
         <MapContainer
           ref={mapRef}
@@ -142,7 +139,6 @@ export default function MapPreview({ latitude, longitude, onSelect, disabled }) 
         )}
         <ClickHandler onSelect={onSelect} disabled={disabled} />
       </MapContainer>
-      {/* Fullscreen button */}
       <button
         onClick={() => setIsFullscreen(true)}
         className="absolute bottom-2 right-2 p-1.5 rounded-lg border border-line bg-base/90 text-muted hover:text-ink hover:bg-raised transition shadow-md"
@@ -151,6 +147,12 @@ export default function MapPreview({ latitude, longitude, onSelect, disabled }) 
       >
         <Maximize2 className="h-4 w-4" aria-hidden="true" />
       </button>
+      {(latitude !== null && longitude !== null) && (
+        <div className="absolute bottom-2 left-2 p-1.5 rounded-lg border border-line bg-base/90 text-[10px] text-muted shadow-md">
+          <Target className="h-3 w-3 inline mr-1" />
+          {latitude.toFixed(4)}, {longitude.toFixed(4)}
+        </div>
+      )}
     </div>
   );
 }

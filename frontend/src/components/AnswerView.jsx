@@ -6,6 +6,13 @@ import TimeSeriesChart from './TimeSeriesChart';
 import SpatialMap from './SpatialMap';
 import FindingsPanel from './FindingsPanel';
 import ProvenanceDrawer from './ProvenanceDrawer';
+import {
+  ResultSummarySkeleton,
+  ChartSkeleton,
+  MapSkeleton,
+  FindingsSkeleton,
+  ActionBarSkeleton
+} from './SkeletonLoader';
 import { formatCoord } from '../utils/format';
 
 export default function AnswerView({
@@ -38,7 +45,6 @@ export default function AnswerView({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // fallback
       const input = document.createElement('input');
       input.value = url;
       document.body.appendChild(input);
@@ -114,16 +120,14 @@ export default function AnswerView({
     navigate(`/?${params.toString()}`);
   };
 
-  if (!result) return null;
-
-  const units = provenance.units;
-  const directionLabel = result.mann_kendall.trend_direction === 'no trend'
+  const showSkeleton = !result || isLoading;
+  const units = provenance?.units || '';
+  const directionLabel = result?.mann_kendall?.trend_direction === 'no trend'
     ? 'No trend'
-    : result.mann_kendall.trend_direction.charAt(0).toUpperCase() + result.mann_kendall.trend_direction.slice(1);
+    : result?.mann_kendall?.trend_direction?.charAt(0).toUpperCase() + result?.mann_kendall?.trend_direction?.slice(1);
 
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Main Content */}
       <main className="flex-1 mx-auto max-w-6xl w-full px-4 py-6 sm:px-6 lg:px-8">
         {/* Context Pills */}
         <div className="mb-6 flex flex-wrap items-center gap-2" role="navigation" aria-label="Investigation context">
@@ -153,124 +157,149 @@ export default function AnswerView({
         </div>
 
         {/* Result Summary */}
-        <ResultSummary
-          result={result}
-          selection={selection}
-          isLoading={isLoading}
-          stale={stale || dirty}
-          copied={copied}
-          onCopyLink={handleCopyLink}
-          onExportCsv={handleExportCsv}
-          onExportJson={handleExportJson}
-          onOpenProvenance={() => setProvenanceOpen(true)}
-        />
+        {showSkeleton ? (
+          <ResultSummarySkeleton />
+        ) : (
+          <>
+            <ResultSummary
+              result={result}
+              selection={selection}
+              isLoading={isLoading}
+              stale={stale || dirty}
+              copied={copied}
+              onCopyLink={handleCopyLink}
+              onExportCsv={handleExportCsv}
+              onExportJson={handleExportJson}
+              onOpenProvenance={() => setProvenanceOpen(true)}
+            />
 
-        {provenanceOpen && (
-          <ProvenanceDrawer
-            provenance={provenance}
-            onClose={() => setProvenanceOpen(false)}
-          />
+            {provenanceOpen && (
+              <ProvenanceDrawer
+                provenance={provenance}
+                onClose={() => setProvenanceOpen(false)}
+              />
+            )}
+          </>
         )}
 
         {/* Chart & Map Grid */}
         <div className="mt-6 grid gap-6 lg:grid-cols-[2fr_1fr]">
-          <section aria-labelledby="chart-heading" className="rounded-xl border border-line bg-surface">
-            <TimeSeriesChart
-              annualData={result.annual_data}
-              monthlyData={result.monthly_data}
-              sensSlope={result.sens_slope}
-              linearRegression={result.linear_regression}
-              variableMeta={{
-                units,
-                name: variableMeta?.name || selection.variable,
-              }}
-            />
-          </section>
+          {showSkeleton ? (
+            <>
+              <ChartSkeleton />
+              <MapSkeleton />
+            </>
+          ) : (
+            <>
+              <section aria-labelledby="chart-heading" className="rounded-xl border border-line bg-surface">
+                <TimeSeriesChart
+                  annualData={result.annual_data}
+                  monthlyData={result.monthly_data}
+                  sensSlope={result.sens_slope}
+                  linearRegression={result.linear_regression}
+                  variableMeta={{
+                    units,
+                    name: variableMeta?.name || selection.variable,
+                  }}
+                />
+              </section>
 
-          <section aria-labelledby="map-heading" className="rounded-xl border border-line bg-surface">
-            <SpatialMap
-              latitude={selection.latitude}
-              longitude={selection.longitude}
-              onSelectCoords={() => {}}
-              spatialMeaning={provenance?.spatial_meaning}
-              variableMeta={{
-                lat_resolution: provenance?.lat_resolution,
-                lon_resolution: provenance?.lon_resolution,
-              }}
-              place={selection.place}
-              isPreview={false}
-            />
-          </section>
+              <section aria-labelledby="map-heading" className="rounded-xl border border-line bg-surface">
+                <SpatialMap
+                  latitude={selection.latitude}
+                  longitude={selection.longitude}
+                  onSelectCoords={() => {}}
+                  spatialMeaning={provenance?.spatial_meaning}
+                  variableMeta={{
+                    lat_resolution: provenance?.lat_resolution,
+                    lon_resolution: provenance?.lon_resolution,
+                  }}
+                  place={selection.place}
+                  isPreview={false}
+                />
+              </section>
+            </>
+          )}
         </div>
 
         {/* Findings & Provenance */}
-        <div className="mt-6 space-y-4">
-          <FindingsPanel
-            findings={result.findings}
-            mannKendall={result.mann_kendall}
-            sensSlope={result.sens_slope}
-            linearRegression={result.linear_regression}
-            provenance={provenance}
-            limitations={result.limitations}
-          />
-        </div>
+        {showSkeleton ? (
+          <FindingsSkeleton />
+        ) : (
+          <div className="mt-6 space-y-4">
+            <FindingsPanel
+              findings={result.findings}
+              mannKendall={result.mann_kendall}
+              sensSlope={result.sens_slope}
+              linearRegression={result.linear_regression}
+              provenance={provenance}
+              limitations={result.limitations}
+            />
+          </div>
+        )}
 
         {/* Action Bar */}
-        <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-line/50 pt-6">
-          <div className="flex flex-wrap items-center gap-2">
+        {showSkeleton ? (
+          <ActionBarSkeleton />
+        ) : (
+          <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-line/50 pt-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleCopyLink}
+                className="inline-flex items-center gap-1.5 min-h-10 px-4 rounded-lg border border-line bg-base text-[11px] font-medium text-muted transition hover:border-accent/50 hover:text-ink"
+                title="Copy a shareable link to this investigation"
+              >
+                {copied ? (
+                  <>
+                    <ArrowRight className="h-3.5 w-3.5 text-significant" aria-hidden="true" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Link2 className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
+                    Copy link
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={handleExportCsv}
+                className="inline-flex items-center gap-1.5 min-h-10 px-4 rounded-lg border border-line bg-base text-[11px] font-medium text-muted transition hover:border-accent/50 hover:text-ink"
+                title="Download data as CSV"
+              >
+                <Download className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
+                <span className="hidden sm:inline">CSV</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleExportJson}
+                className="inline-flex items-center gap-1.5 min-h-10 px-4 rounded-lg border border-line bg-base text-[11px] font-medium text-muted transition hover:border-accent/50 hover:text-ink"
+                title="Download full results as JSON"
+              >
+                <FileJson className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
+                <span className="hidden sm:inline">JSON</span>
+              </button>
+            </div>
+
             <button
               type="button"
-              onClick={handleCopyLink}
-              className="inline-flex items-center gap-1.5 min-h-10 px-4 rounded-lg border border-line bg-base text-[11px] font-medium text-muted transition hover:border-accent/50 hover:text-ink"
-              title="Copy a shareable link to this investigation"
+              onClick={handleNewInvestigation}
+              className="inline-flex items-center gap-1.5 min-h-10 px-5 rounded-lg bg-accent text-inverse font-semibold text-[11px] transition hover:bg-accent-deep"
             >
-              {copied ? (
-                <>
-                  <ArrowRight className="h-3.5 w-3.5 text-significant" aria-hidden="true" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Link2 className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
-                  Copy link
-                </>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              className="inline-flex items-center gap-1.5 min-h-10 px-4 rounded-lg border border-line bg-base text-[11px] font-medium text-muted transition hover:border-accent/50 hover:text-ink"
-              title="Download data as CSV"
-            >
-              <Download className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
-              <span className="hidden sm:inline">CSV</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleExportJson}
-              className="inline-flex items-center gap-1.5 min-h-10 px-4 rounded-lg border border-line bg-base text-[11px] font-medium text-muted transition hover:border-accent/50 hover:text-ink"
-              title="Download full results as JSON"
-            >
-              <FileJson className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
-              <span className="hidden sm:inline">JSON</span>
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              Start new investigation
             </button>
           </div>
+        )}
 
-          <button
-            type="button"
-            onClick={handleNewInvestigation}
-            className="inline-flex items-center gap-1.5 min-h-10 px-5 rounded-lg bg-accent text-inverse font-semibold text-[11px] transition hover:bg-accent-deep"
-          >
-            <ArrowRight className="h-4 w-4" aria-hidden="true" />
-            Start new investigation
-          </button>
-        </div>
+        {/* Footer */}
+        <footer className="mt-10 border-t border-line/50 bg-base/50 px-4 py-4 text-center text-[10px] text-muted">
+          <a href="https://power.larc.nasa.gov/" target="_blank" rel="noreferrer" className="text-accent hover:underline">
+            Data source: NASA POWER
+          </a> · Imagery: NASA GIBS VIIRS Black Marble
+        </footer>
       </main>
-
-      {/* Footer */}
-      <footer className="border-t border-line/50 bg-base/50 px-4 py-4 text-center text-[10px] text-muted">
-        <a href="https://power.larc.nasa.gov/" target="_blank" rel="noreferrer" className="text-accent hover:underline">Data source: NASA POWER</a> · Imagery: NASA GIBS VIIRS Black Marble
-      </footer>
     </div>
   );
 }

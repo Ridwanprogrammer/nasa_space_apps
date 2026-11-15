@@ -51,6 +51,7 @@ export default function AskView({ variables, catalog, presets, onInvestigate, en
   const [place, setPlace] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [geoError, setGeoError] = useState(null);
+  const [manualCoords, setManualCoords] = useState({ lat: '', lon: '' });
 
   const variableMeta = variables.find(v => v.id === selectedVariable) || VARIABLE_OPTIONS[0];
   const minYear = variableMeta?.min_year ?? catalog?.min_year ?? 1981;
@@ -65,10 +66,32 @@ export default function AskView({ variables, catalog, presets, onInvestigate, en
     setCustomEnd(end);
   }, [minYear, maxYear, latestComplete]);
 
+  // Sync manual coords with lat/lon state
+  const handleManualCoordsChange = useCallback((field, value) => {
+    const numValue = value === '' ? '' : parseFloat(value);
+    setManualCoords(prev => ({ ...prev, [field]: value }));
+    if (!isNaN(numValue)) {
+      if (field === 'lat') setLatitude(numValue);
+      else setLongitude(numValue);
+    } else {
+      if (field === 'lat') setLatitude(null);
+      else setLongitude(null);
+    }
+  }, []);
+
+  // Sync lat/lon state to manual coords display
+  useEffect(() => {
+    setManualCoords(prev => ({
+      lat: latitude !== null ? latitude.toFixed(4) : prev.lat,
+      lon: longitude !== null ? longitude.toFixed(4) : prev.lon,
+    }));
+  }, [latitude, longitude]);
+
   const handleLocationSelect = useCallback((loc) => {
     setLatitude(loc.latitude);
     setLongitude(loc.longitude);
     setPlace(loc.place);
+    setManualCoords({ lat: loc.latitude.toFixed(4), lon: loc.longitude.toFixed(4) });
     setGeoError(null);
   }, []);
 
@@ -77,6 +100,7 @@ export default function AskView({ variables, catalog, presets, onInvestigate, en
     setLongitude(lon);
     const match = findLocationForCoords(lat, lon);
     setPlace(match ? `${match.name}, ${match.admin}` : 'Custom point');
+    setManualCoords({ lat: lat.toFixed(4), lon: lon.toFixed(4) });
     setGeoError(null);
   }, []);
 
