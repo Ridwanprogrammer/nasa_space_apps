@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { ArrowRight, Search, Crosshair, Loader2, Sun, Cloud, Droplet, MapPin } from 'lucide-react';
 import LocationSearch from './LocationSearch';
 import { BENCHMARK, selectionToSearchParams } from '../utils/url';

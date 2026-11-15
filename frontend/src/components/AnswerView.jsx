@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { ChevronLeft, Download, FileJson, Link2, Loader2, RotateCcw, ArrowRight } from 'lucide-react';
 import ResultSummary from './ResultSummary';
 import TimeSeriesChart from './TimeSeriesChart';
