@@ -1,0 +1,203 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+/* EarthScope design tokens — Ink & Solar Amber */
+@theme {
+  --color-base: #0b0f14;
+  --color-surface: #121820;
+  --color-raised: #1a222c;
+  --color-line: #2a3542;
+  --color-ink: #ecf1f5;
+  --color-inverse: #0b0f14;
+  --color-muted: #9aa7b4;
+  --color-accent: #f2a93b;
+  --color-accent-deep: #c97f1e;
+  --color-cool: #6fa8c9;
+  --color-significant: #4ade80;
+  --color-danger: #ef4444;
+
+  --font-sans: "IBM Plex Sans Variable", "IBM Plex Sans", ui-sans-serif, system-ui,
+    -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  --radius-card: 0.875rem;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: var(--color-base);
+    background-image:
+      radial-gradient(70rem 32rem at 85% -12%, rgba(242, 169, 59, 0.07), transparent 70%),
+      radial-gradient(55rem 30rem at -10% 0%, rgba(111, 168, 201, 0.05), transparent 70%);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01" 1, "cv05" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: rgba(242, 169, 59, 0.32);
+    color: #ffffff;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  input[type="number"] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Keep the native picker usable on the dark surface */
+  select option {
+    background-color: var(--color-raised);
+    color: var(--color-ink);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* Numeric data should never wobble as values change */
+.numeric {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Slim scrollbars tuned to the ink surfaces */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3a4757;
+}
+
+/* Leaflet: align the map chrome with the EarthScope surfaces */
+.leaflet-container {
+  background: var(--color-base) !important;
+  font-family: var(--font-sans);
+  border-radius: 0;
+  z-index: 0;
+}
+
+.leaflet-control-attribution {
+  background: rgba(11, 15, 20, 0.82) !important;
+  color: var(--color-muted) !important;
+  font-size: 10px !important;
+  padding: 2px 6px !important;
+}
+
+.leaflet-control-attribution a {
+  color: var(--color-accent) !important;
+}
+
+.leaflet-bar {
+  border: 1px solid var(--color-line) !important;
+  border-radius: 8px !important;
+  overflow: hidden;
+}
+
+.leaflet-bar a {
+  background-color: var(--color-surface) !important;
+  border-bottom: 1px solid var(--color-line) !important;
+  color: var(--color-ink) !important;
+}
+
+.leaflet-bar a:last-child {
+  border-bottom: 0 !important;
+}
+
+.leaflet-bar a:hover,
+.leaflet-bar a:focus-visible {
+  background-color: var(--color-raised) !important;
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--color-surface) !important;
+  color: var(--color-ink) !important;
+  border: 1px solid var(--color-line);
+  box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.75);
+}
+
+.leaflet-popup-content {
+  margin: 10px 12px;
+  line-height: 1.45;
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+  color: var(--color-muted);
+}
+
+.leaflet-control-scale-line {
+  background: rgba(11, 15, 20, 0.82) !important;
+  border: 1px solid var(--color-line) !important;
+  border-top: 0 !important;
+  color: var(--color-muted) !important;
+  font-family: var(--font-mono);
+  font-size: 10px !important;
+}
+
+/* Investigation marker rendered as a local divIcon (no remote image requests) */
+.earthscope-marker {
+  background: transparent;
+  border: 0;
+}
+
+.earthscope-marker span {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  border: 3px solid var(--color-base);
+  box-shadow:
+    0 0 0 2px var(--color-accent),
+    0 0 22px rgba(242, 169, 59, 0.65);
+}
