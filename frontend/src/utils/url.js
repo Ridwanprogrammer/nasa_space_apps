@@ -77,3 +77,24 @@ export function sameSelection(a, b) {
     Number(a.endYear) === Number(b.endYear)
   );
 }
+
+export function normalizeSelection(selection, variables, catalog) {
+  const meta = variables.find((item) => item.id === selection.variable) || variables[0];
+  if (!meta) return selection;
+  const minYear = meta.min_year ?? catalog?.min_year ?? 1981;
+  const maxYear = meta.max_year ?? catalog?.max_year ?? 2026;
+  return {
+    ...selection,
+    variable: meta.id,
+    latitude: Number(clamp(selection.latitude, -90, 90, BENCHMARK.latitude).toFixed(4)),
+    longitude: Number(clamp(selection.longitude, -180, 180, BENCHMARK.longitude).toFixed(4)),
+    startYear: Math.round(clamp(selection.startYear, minYear, maxYear, BENCHMARK.startYear)),
+    endYear: Math.round(clamp(selection.endYear, minYear, maxYear, BENCHMARK.endYear))
+  };
+}
+
+function clamp(value, min, max, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(Math.max(number, min), max);
+}
