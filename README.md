@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # EarthScope — NASA Space Apps 2026
 
 **Challenge:** Be An Earth System Trend Detective!
@@ -216,6 +215,3 @@ See `ASSETS.md` for the full data-source, palette, imagery, font, and gazetteer 
 
 These caveats also appear in the app's **Methods** modal, findings panel, and provenance
 drawer.
-=======
-# nasa_space_apps
->>>>>>> 3036fe39a0b862e448a8ee2e439c84d144d517af
